@@ -39,14 +39,14 @@ HOMEWORK_VERDICTS = {
 
 
 def check_tokens():
-    """проверяет доступность переменных окружения"""
+    """Проверяет доступность переменных окружения."""
     if PRACTICUM_TOKEN is None or TELEGRAM_TOKEN is None:
         return False
     return True
 
 
 def send_message(bot, message):
-    """отправляет сообщение в телеграмм"""
+    """Отправляет сообщение в телеграмм."""
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
         logging.debug(f'Сообщение удачно отправлено: {message}!')
@@ -55,7 +55,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-    """Получает ответ API"""
+    """Получает ответ API."""
     payload = {'from_date': timestamp}
     try:
         homework_statuses = requests.get(
@@ -78,7 +78,7 @@ def get_api_answer(timestamp):
 
 
 def check_response(response):
-    """Проверяет ответ API на соответствие документации """
+    """Проверяет ответ API на соответствие документации."""
     response_keys = ['homeworks', 'current_date']
     try:
         if type(response) != dict or type(response['homeworks']) != list:
@@ -102,8 +102,10 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """извлекает из информации о конкретной
-    домашней работе статус этой работы"""
+    """
+    Извлекает из информации о конкретной
+    домашней работе статус этой работы.
+    """
     try:
         if homework['status'] in HOMEWORK_VERDICTS.keys():
             verdict = HOMEWORK_VERDICTS[homework['status']]
@@ -135,7 +137,6 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-
     if check_tokens():
         bot = telegram.Bot(token=TELEGRAM_TOKEN)
         timestamp = 0
@@ -155,9 +156,9 @@ def main():
                 logging.error(message)
             time.sleep(RETRY_PERIOD)
     else:
-        logging.critical(f'Отсутствуют обязательные переменные окружения!')
+        logging.critical('Отсутствуют обязательные переменные окружения!')
         raise RequiredVariablesAbsent(
-            f'Отсутствуют обязательные переменные окружения!'
+            'Отсутствуют обязательные переменные окружения!'
         )
 
 

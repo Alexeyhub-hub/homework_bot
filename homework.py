@@ -71,8 +71,8 @@ def check_response(response: dict):
     """Проверяет ответ API на соответствие документации."""
     response_keys = ['homeworks', 'current_date']
     try:
-        if (isinstance(response, dict) is False or
-                isinstance(response['homeworks'], list) is False):
+        if (isinstance(response, dict) is False
+                or isinstance(response['homeworks'], list) is False):
             raise TypeError
         for key in response_keys:
             if key not in response.keys():

@@ -14,17 +14,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO,
-    filename='mylog.log',
-    filemode='a'
-)
-
-
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID = 513129555
+TELEGRAM_CHAT_ID = os.getenv('CHAT_ID')
 
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
@@ -40,12 +32,12 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    if PRACTICUM_TOKEN is None or TELEGRAM_TOKEN is None:
-        return False
-    return True
+    if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
+        return True
+    return False
 
 
-def send_message(bot, message):
+def send_message(bot: telegram.bot.Bot, message: str):
     """Отправляет сообщение в телеграмм."""
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
@@ -54,7 +46,7 @@ def send_message(bot, message):
         logging.error(f'Ошибка при отправке сообщения: {error}')
 
 
-def get_api_answer(timestamp):
+def get_api_answer(timestamp: int):
     """Получает ответ API."""
     payload = {'from_date': timestamp}
     try:
@@ -70,22 +62,23 @@ def get_api_answer(timestamp):
             )
         else:
             return homework_statuses.json()
-    except StatusCodeIsNot200 as error:
-        logging.error(error)
-        raise StatusCodeIsNot200(error)
     except Exception as error:
         logging.error(f'Ошибка при запросе к API: {error}')
+        raise Exception(f'Ошибка при запросе к API: {error}')
 
 
-def check_response(response):
+def check_response(response: dict):
     """Проверяет ответ API на соответствие документации."""
     response_keys = ['homeworks', 'current_date']
     try:
-        if type(response) != dict or type(response['homeworks']) != list:
+        if (isinstance(response, dict) is False or
+                isinstance(response['homeworks'], list) is False):
             raise TypeError
         for key in response_keys:
             if key not in response.keys():
                 raise KeyError
+        if len(response['homeworks']) == 0:
+            raise TypeError
         return True
     except TypeError as error:
         logging.error(
@@ -99,20 +92,21 @@ def check_response(response):
         raise KeyError(f'Отсутствие ожидаемых ключей в ответе API: {error}')
     except Exception as error:
         logging.error(f'Ответ api не соответствует документации: {error}')
+        raise Exception(f'Ответ api не соответствует документации: {error}')
 
 
-def parse_status(homework):
+def parse_status(homework: dict):
     """Извлекает из информации о домашней работе статус этой работы."""
     try:
         if homework['status'] in HOMEWORK_VERDICTS.keys():
-            verdict = HOMEWORK_VERDICTS[homework['status']]
             if 'homework_name' in homework.keys():
                 homework_name = homework['homework_name']
             else:
                 raise KeyError
             return (
                 f'Изменился статус проверки работы '
-                f'"{homework_name}". {verdict}'
+                f'"{homework_name}". '
+                f'{HOMEWORK_VERDICTS[homework["status"]]}'
             )
         else:
             raise TypeError
@@ -130,6 +124,7 @@ def parse_status(homework):
         )
     except Exception as error:
         logging.error(error)
+        raise Exception(error)
 
 
 def main():
@@ -141,12 +136,14 @@ def main():
         while True:
             try:
                 response = get_api_answer(timestamp)
-                print(response)
                 if check_response(response) is True:
                     status = parse_status(response['homeworks'][0])
                     if status != previous_status:
                         send_message(bot, status)
                         previous_status = str(status)
+            except StatusCodeIsNot200 as error:
+                logging.error(error)
+                raise StatusCodeIsNot200(error)
             except Exception as error:
                 message = f'Сбой в работе программы: {error}'
                 send_message(bot, message)
@@ -160,4 +157,10 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        level=logging.INFO,
+        filename='mylog.log',
+        filemode='a'
+    )
     main()

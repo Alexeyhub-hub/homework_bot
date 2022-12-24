@@ -32,9 +32,7 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверяет доступность переменных окружения."""
-    if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
-        return True
-    return False
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot: telegram.bot.Bot, message: str):
@@ -63,7 +61,6 @@ def get_api_answer(timestamp: int):
         else:
             return homework_statuses.json()
     except Exception as error:
-        logging.error(f'Ошибка при запросе к API: {error}')
         raise Exception(f'Ошибка при запросе к API: {error}')
 
 
@@ -109,19 +106,10 @@ def parse_status(homework: dict):
                 f'{HOMEWORK_VERDICTS[homework["status"]]}'
             )
         else:
-            raise TypeError
-    except TypeError as error:
-        logging.error(f'Получен недокументированный статус домашки: {error}')
-        raise TypeError('Получен недокументированный статус домашки: {error}')
+            raise KeyError
     except KeyError as error:
-        logging.error(
-            f'В ответе API домашки нет ключа '
-            f'`homework_name`: {error}'
-        )
-        raise KeyError(
-            f'В ответе API домашки нет ключа '
-            f'`homework_name`: {error}'
-        )
+        logging.error(f'Получен недокументированный статус домашки: {error}')
+        raise KeyError(f'Получен недокументированный статус домашки: {error}')
     except Exception as error:
         logging.error(error)
         raise Exception(error)
@@ -129,31 +117,31 @@ def parse_status(homework: dict):
 
 def main():
     """Основная логика работы бота."""
-    if check_tokens():
-        bot = telegram.Bot(token=TELEGRAM_TOKEN)
-        timestamp = 0
-        previous_status = ''
-        while True:
-            try:
-                response = get_api_answer(timestamp)
-                if check_response(response) is True:
-                    status = parse_status(response['homeworks'][0])
-                    if status != previous_status:
-                        send_message(bot, status)
-                        previous_status = str(status)
-            except StatusCodeIsNot200 as error:
-                logging.error(error)
-                raise StatusCodeIsNot200(error)
-            except Exception as error:
-                message = f'Сбой в работе программы: {error}'
-                send_message(bot, message)
-                logging.error(message)
-            time.sleep(RETRY_PERIOD)
-    else:
+    if not check_tokens():
         logging.critical('Отсутствуют обязательные переменные окружения!')
         raise RequiredVariablesAbsent(
             'Отсутствуют обязательные переменные окружения!'
         )
+
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
+    timestamp = 0
+    previous_status = ''
+    while True:
+        try:
+            response = get_api_answer(timestamp)
+            if check_response(response) is True:
+                status = parse_status(response['homeworks'][0])
+                if status != previous_status:
+                    send_message(bot, status)
+                    previous_status = str(status)
+        except StatusCodeIsNot200 as error:
+            logging.error(error)
+        except Exception as error:
+            message = f'Сбой в работе программы: {error}'
+            send_message(bot, message)
+            logging.error(message)
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
